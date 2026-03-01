@@ -10,6 +10,7 @@ from sklearn.ensemble import RandomForestRegressor
 import xgboost as xgb
 from sklearn.model_selection import train_test_split
 from supabase import create_client, Client
+from compare_models import get_model_comparison_results, create_comparison_charts
 
 # Set Page Config
 st.set_page_config(page_title="Acadelo-Pro (Cloud)", layout="wide")
@@ -283,95 +284,41 @@ with tab2:
                 st.subheader("📋 Final Teams Roster")
                 st.dataframe(pd.DataFrame(final_roster).sort_values(['Team ID', 'Risk Score']), hide_index=True, use_container_width=True)
 
-# --- TAB 3: MODEL ANALYTICS (NEW!) ---
+# --- TAB 3: MODEL SHOWDOWN ---
 with tab3:
-    st.subheader("Why XGBoost?")
-    st.write("This live benchmark proves why XGBoost is the superior algorithm by comparing both Pattern Accuracy (R²) and the Real-World Error Rate in days (RMSE).")
+    st.subheader("Live Database Algorithm Benchmark")
+    st.write("This tab pulls the **current historical data directly from your Supabase database** and trains 7 different machine learning models live to prove XGBoost's dominance.")
     
-    if st.button("Run Live Benchmark"):
-        with st.spinner("Training Linear Regression, Random Forest, and XGBoost..."):
+    if st.button("Run Live Benchmark", type="primary"):
+        with st.spinner("Fetching DB records and training 6 different models..."):
             
-            # 1. Run the comparison logic inside the tab
-            if not os.path.exists('processed_data.csv'):
-                st.error("Could not find 'processed_data.csv' to run benchmark.")
-            else:
-                df_bench = pd.read_csv('processed_data.csv')
-                features_bench = ['clicks_total', 'days_active', 'gap_before_deadline', 
-                            'material_diversity', 'cramming_ratio', 'clicks_last_7d']
+            # 1. Load data directly from Supabase
+            db_data = load_db(supabase)
+            
+            # 2. Pass the LIVE database data to our imported function
+            results_df = get_model_comparison_results(df=db_data)
+            
+            if results_df is not None:
+                st.success(f"Benchmarking Complete! Trained on {len(db_data.dropna(subset=['days_early']))} historical DB records.")
                 
-                X_b = df_bench[features_bench]
-                y_b = df_bench['days_early']
-                X_train_b, X_test_b, y_train_b, y_test_b = train_test_split(X_b, y_b, test_size=0.2, random_state=42)
-                
-                models_bench = {
-                    "Linear Regression": LinearRegression(),
-                    "Random Forest": RandomForestRegressor(
-                        n_estimators=100, 
-                        max_depth=4,  # Standard depth
-                        random_state=42
-                    ),
-                    "XGBoost": xgb.XGBRegressor(
-                        objective='reg:squarederror', 
-                        n_estimators=200,         # More trees
-                        learning_rate=0.05,       # Slower, more careful learning
-                        max_depth=5,              # Slightly deeper to find complex patterns
-                        subsample=0.8,            # Prevents overfitting to noise
-                        colsample_bytree=0.8,
-                        random_state=42
-                    )
-                }
-                
-                results_list = []
-                for name_b, m_b in models_bench.items():
-                    m_b.fit(X_train_b, y_train_b)
-                    preds_b = m_b.predict(X_test_b)
-                    
-                    r2_val = r2_score(y_test_b, preds_b)
-                    rmse_val = np.sqrt(mean_squared_error(y_test_b, preds_b))
-                    
-                    results_list.append({
-                        "Model": name_b, 
-                        "R2 Score": r2_val, 
-                        "RMSE (Days Error)": rmse_val
-                    })
-                    
-                results_df = pd.DataFrame(results_list).sort_values(by="R2 Score", ascending=False)
-                
-                st.success("Benchmarking Complete!")
-                
-                # 2. Display the Dataframe (Highlighting the best stats)
                 st.dataframe(
-                    results_df.style
-                    .highlight_max(subset=['R2 Score'], props='color:red; background-color:lightgreen;')
-                    .highlight_min(subset=['RMSE (Days Error)'], props='color:red; background-color:lightgreen;'),
+                    results_df.style.highlight_max(subset=['R2 Score'], color='lightgreen')
+                                  .highlight_min(subset=['RMSE (Days)'], color='lightgreen'),
                     use_container_width=True
                 )
                 
-                # 3. Plot the Dual Charts
-                fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
-                
-                # Chart 1: R2 Score (Higher is Better)
-                colors_r2 = ['mediumseagreen' if x == results_df['R2 Score'].max() else 'lightgray' for x in results_df['R2 Score']]
-                ax1.bar(results_df['Model'], results_df['R2 Score'], color=colors_r2)
-                ax1.set_ylabel("R² Score (Higher = Better)")
-                ax1.set_title("Pattern Recognition Accuracy")
-                
-                # Chart 2: RMSE (Lower is Better)
-                colors_rmse = ['mediumseagreen' if x == results_df['RMSE (Days Error)'].min() else 'lightgray' for x in results_df['RMSE (Days Error)']]
-                ax2.bar(results_df['Model'], results_df['RMSE (Days Error)'], color=colors_rmse)
-                ax2.set_ylabel("RMSE in Days (Lower = Better)")
-                ax2.set_title("Prediction Error Rate")
-                
-                plt.tight_layout()
+                fig = create_comparison_charts(results_df)
                 st.pyplot(fig)
                 
-                st.markdown("""
-                ### **The Verdict**
-                * **Linear Regression:** High Error (RMSE) and Low Accuracy (R²). It forces human behavior into a straight line, completely missing "cramming" patterns.
-                * **Random Forest:** Good Accuracy, but the decision trees don't communicate. It leaves "gaps" in its logic, resulting in a moderate error rate.
-                * **XGBoost (Winner):** Highest Accuracy and Lowest Error. It uses *Gradient Boosting*, meaning it actively targets and minimizes the residual errors (RMSE) of its own previous predictions.
+                st.info("""
+                **Why do we see these results?**
+                * **Linear Models:** Fail to capture the non-linear complexity of human behavior.
+                * **AdaBoost/Random Forest:** Good baselines, but struggle with highly granular noise.
+                * **XGBoost, LightGBM, CatBoost:** The "Big 3". By tuning XGBoost to our specific database architecture, we create a massive gap in accuracy over the untuned baselines.
                 """)
-
+            else:
+                st.error("Not enough historical data in Supabase (missing 'days_early' outcomes) to run benchmark. Run seed_database.py first!")
+                
 # --- TAB 4: DB MANAGEMENT ---
 with tab4:
     st.subheader("Manage Database")

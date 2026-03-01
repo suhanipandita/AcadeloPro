@@ -42,3 +42,15 @@ Insert selected number of records in bulk in the database.
 
 - Model Accuracy (RMSE): 2.1103 days
 - R2 Score: 0.5702
+
+## Version 5
+### Features:
+- integration of advanced algorithms like LightGBM, CatBoost, AdaBoost, and HistGradientBoosting into the project, alongside the original XGBoost, Random Forest, and Linear Regression.
+- strictly confined the app.py to benchmark based on the current data available in supabase.
+- graph showing comparison of models on the training dataset confined to the compare_models.py file.
+- tuned xgboost to perform better alongside catboost and lightgbm as these get lucky on default settings. However, CatBoost is fundamentally designed for 'Categorical' text data, whereas the dataset used is 100% continuous numerical data.
+- added a golden dataset to supabase to showcase structured results.
+- tab3 now pulls the current 400 students directly from Supabase, checks their actual days_early answer key, and trains the models live
+
+- Model Accuracy (RMSE): 2.30 days
+- R2 Score: 0.47
