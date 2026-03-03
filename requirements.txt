@@ -1,9 +1,10 @@
 streamlit
-shap
 pandas
 numpy
-xgboost
-matplotlib
-supabase
 scikit-learn
+xgboost
 lightgbm
+catboost
+matplotlib
+shap
+supabase
