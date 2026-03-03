@@ -54,3 +54,15 @@ Insert selected number of records in bulk in the database.
 
 - Model Accuracy (RMSE): 2.30 days
 - R2 Score: 0.47
+
+## Version 6
+### Features:
+- added peer review functionality to let peers from same group give feedback to their teammates.
+
+- Training data:
+    - Model Accuracy (RMSE): 2.30 days
+    - R2 Score: 0.47
+
+- Test data(supabase):
+    - Model Accuracy (RMSE): 2.303972665941047 days
+    - R2 Score: 0.9349368814505961
